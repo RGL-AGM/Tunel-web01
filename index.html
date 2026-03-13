@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Túnel de viento R01</title>
+</head>
+<body>
+  <div id="app">
+
+    <aside id="sidebar">
+
+      <div class="block">
+        <div class="title">Modelo</div>
+
+        <div class="row">
+          <label class="file">
+            Cargar OBJ/STL
+            <input id="fileInput" type="file" accept=".obj,.stl">
+          </label>
+          <button id="clearModel" type="button">Quitar</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="title">Simulación</div>
+
+        <div class="row col">
+          <label>Velocidad <span id="speedVal"></span></label>
+          <input id="speed" type="range" min="20" max="400" step="5" value="120">
+        </div>
+
+        <div class="row col">
+          <label>Altura suelo <span id="groundVal"></span></label>
+          <input id="ground" type="range" min="0" max="0.8" step="0.01" value="0.10">
+        </div>
+
+        <div class="row col">
+          <label>Masa vehículo <span id="massVal"></span></label>
+          <input id="mass" type="range" min="300" max="2500" step="10" value="1200">
+        </div>
+
+        <div class="row col">
+          <label>Coef. rodadura <span id="rollingVal"></span></label>
+          <input id="rollingCoeff" type="range" min="0.005" max="0.03" step="0.001" value="0.012">
+        </div>
+
+        <div class="row col">
+          <label>Potencia motor <span id="powerVal"></span></label>
+          <input id="motorPower" type="range" min="20" max="1200" step="10" value="200">
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="title">Escala real</div>
+
+        <div class="row col">
+          <label>Longitud real (m)</label>
+          <input id="realLengthInput" type="number" step="0.01" min="0" placeholder="4.73">
+        </div>
+
+        <div class="row col">
+          <label>Anchura real (m)</label>
+          <input id="realWidthInput" type="number" step="0.01" min="0" placeholder="1.89">
+        </div>
+
+        <div class="row col">
+          <label>Altura real (m)</label>
+          <input id="realHeightInput" type="number" step="0.01" min="0" placeholder="1.60">
+        </div>
+
+        <div class="row">
+          <button id="applyUniformScaleBtn" type="button">Aplicar escala uniforme</button>
+        </div>
+
+        <div class="row">
+          <button id="applyXYZScaleBtn" type="button">Aplicar escala XYZ</button>
+          <button id="resetScaleBtn" type="button">Reset escala</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="title">Visualización</div>
+
+        <div class="row">
+          <label><input id="showFlow" type="checkbox" checked> Flujo</label>
+          <label><input id="showWake" type="checkbox" checked> Estela</label>
+        </div>
+
+        <div class="row">
+          <label><input id="showPressure" type="checkbox" checked> Presión</label>
+          <label><input id="showFloor" type="checkbox" checked> Suelo</label>
+        </div>
+
+        <div class="row">
+          <button id="playBtn" type="button">Play</button>
+          <button id="stopBtn" type="button">Stop</button>
+          <button id="resetCam" type="button">Reset cámara</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="title">Rotación manual</div>
+
+        <div class="row">
+          <button id="rotXPos" type="button">X +90°</button>
+          <button id="rotXNeg" type="button">X -90°</button>
+        </div>
+
+        <div class="row">
+          <button id="rotYPos" type="button">Y +90°</button>
+          <button id="rotYNeg" type="button">Y -90°</button>
+        </div>
+
+        <div class="row">
+          <button id="rotZPos" type="button">Z +90°</button>
+          <button id="rotZNeg" type="button">Z -90°</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="title">Geometría</div>
+
+        <div class="metric"><span>Longitud</span><b id="lengthOut">—</b></div>
+        <div class="metric"><span>Anchura</span><b id="widthOut">—</b></div>
+        <div class="metric"><span>Altura</span><b id="heightOut">—</b></div>
+        <div class="metric"><span>Área frontal</span><b id="frontalAreaOut">—</b></div>
+        <div class="metric"><span>Superficie</span><b id="surfaceOut">—</b></div>
+        <div class="metric"><span>Volumen</span><b id="volumeOut">—</b></div>
+      </div>
+
+      <div class="block">
+        <div class="title">Aerodinámica</div>
+
+        <div class="metric"><span>Cd</span><b id="cdOut">—</b></div>
+        <div class="metric"><span>Drag</span><b id="dragOut">—</b></div>
+        <div class="metric"><span>Downforce</span><b id="downforceOut">—</b></div>
+      </div>
+
+      <div class="block">
+        <div class="title">Dinámica</div>
+
+        <div class="metric"><span>Potencia aero</span><b id="aeroPowerOut">—</b></div>
+        <div class="metric"><span>Potencia total</span><b id="totalPowerOut">—</b></div>
+        <div class="metric"><span>Velocidad máxima</span><b id="topSpeedOut">—</b></div>
+      </div>
+
+      <div class="block">
+        <div class="title">Ensayos</div>
+
+        <div class="row">
+          <button id="saveTestBtn" type="button">Guardar ensayo</button>
+          <button id="exportCsvBtn" type="button">Exportar CSV</button>
+        </div>
+
+        <div class="row">
+          <button id="clearHistoryBtn" type="button">Borrar histórico</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <main id="viewerArea">
+      <canvas id="mainCanvas"></canvas>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
