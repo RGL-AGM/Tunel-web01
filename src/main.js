@@ -1,39 +1,19 @@
-import "./style.css"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js"
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 
-import { analyzeGeometry } from "./geometry.js"
-import { computeAerodynamics } from "./aerodynamics.js"
-import { computeVehicleDynamics } from "./vehicleDynamics.js"
-import { createFlowField, updateFlowField } from "./flowfield.js"
-import { saveTestResult, exportCSV, clearHistory } from "./export.js"
+import { createFlowField, updateFlowField, resetFlowField } from "./flowfield.js"
 
-/* ---------------- UI ---------------- */
+const SOFTWARE_VERSION = "R01.3"
+
 const ui = {
   fileInput: document.getElementById("fileInput"),
   clearModel: document.getElementById("clearModel"),
 
   speed: document.getElementById("speed"),
   ground: document.getElementById("ground"),
-  mass: document.getElementById("mass"),
-  rollingCoeff: document.getElementById("rollingCoeff"),
-  motorPower: document.getElementById("motorPower"),
-
-  speedVal: document.getElementById("speedVal"),
-  groundVal: document.getElementById("groundVal"),
-  massVal: document.getElementById("massVal"),
-  rollingVal: document.getElementById("rollingVal"),
-  powerVal: document.getElementById("powerVal"),
-
-  realLengthInput: document.getElementById("realLengthInput"),
-  realWidthInput: document.getElementById("realWidthInput"),
-  realHeightInput: document.getElementById("realHeightInput"),
-  applyUniformScaleBtn: document.getElementById("applyUniformScaleBtn"),
-  applyXYZScaleBtn: document.getElementById("applyXYZScaleBtn"),
-  resetScaleBtn: document.getElementById("resetScaleBtn"),
-
   showFlow: document.getElementById("showFlow"),
   showWake: document.getElementById("showWake"),
   showPressure: document.getElementById("showPressure"),
@@ -43,10 +23,6 @@ const ui = {
   stopBtn: document.getElementById("stopBtn"),
   resetCam: document.getElementById("resetCam"),
 
-  saveTestBtn: document.getElementById("saveTestBtn"),
-  exportCsvBtn: document.getElementById("exportCsvBtn"),
-  clearHistoryBtn: document.getElementById("clearHistoryBtn"),
-
   rotXPos: document.getElementById("rotXPos"),
   rotXNeg: document.getElementById("rotXNeg"),
   rotYPos: document.getElementById("rotYPos"),
@@ -54,46 +30,47 @@ const ui = {
   rotZPos: document.getElementById("rotZPos"),
   rotZNeg: document.getElementById("rotZNeg"),
 
+  realLength: document.getElementById("realLength"),
+  realWidth: document.getElementById("realWidth"),
+  realHeight: document.getElementById("realHeight"),
+  applyUniformScale: document.getElementById("applyUniformScale"),
+  applyXYZScale: document.getElementById("applyXYZScale"),
+  resetScale: document.getElementById("resetScale"),
+
+  speedVal: document.getElementById("speedVal"),
+  groundVal: document.getElementById("groundVal"),
+
   lengthOut: document.getElementById("lengthOut"),
   widthOut: document.getElementById("widthOut"),
   heightOut: document.getElementById("heightOut"),
   frontalAreaOut: document.getElementById("frontalAreaOut"),
-  surfaceOut: document.getElementById("surfaceOut"),
-  volumeOut: document.getElementById("volumeOut"),
-
   cdOut: document.getElementById("cdOut"),
   dragOut: document.getElementById("dragOut"),
-  downforceOut: document.getElementById("downforceOut"),
+  wakeOut: document.getElementById("wakeOut"),
 
-  aeroPowerOut: document.getElementById("aeroPowerOut"),
-  totalPowerOut: document.getElementById("totalPowerOut"),
-  topSpeedOut: document.getElementById("topSpeedOut"),
+  simStatus: document.getElementById("simStatus"),
+  fpsBox: document.getElementById("fpsBox"),
+  softwareVersion: document.getElementById("softwareVersion"),
 }
 
-function fmt(value, digits = 2, suffix = "") {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—"
-  return `${Number(value).toFixed(digits)}${suffix}`
+if (ui.softwareVersion) ui.softwareVersion.textContent = SOFTWARE_VERSION
+
+function fmt(v, d = 2, s = "") {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—"
+  return `${Number(v).toFixed(d)}${s}`
 }
 
-function clampGround() {
-  return Math.max(0, Number(ui.ground.value))
-}
-
-function getNumInput(el) {
+function readPositiveInput(el) {
   const v = Number(el?.value)
   return Number.isFinite(v) && v > 0 ? v : null
 }
 
-function syncLabels() {
-  ui.speedVal.textContent = `${ui.speed.value} km/h`
-  ui.groundVal.textContent = `${Number(ui.ground.value).toFixed(2)} m`
-  ui.massVal.textContent = `${ui.mass.value} kg`
-  ui.rollingVal.textContent = Number(ui.rollingCoeff.value).toFixed(3)
-  ui.powerVal.textContent = `${ui.motorPower.value} kW`
+function updateLabels() {
+  if (ui.speedVal) ui.speedVal.textContent = `${ui.speed.value} km/h`
+  if (ui.groundVal) ui.groundVal.textContent = `${Number(ui.ground.value).toFixed(2)} m`
 }
-syncLabels()
+updateLabels()
 
-/* ---------------- Scene ---------------- */
 const canvas = document.getElementById("mainCanvas")
 
 const renderer = new THREE.WebGLRenderer({
@@ -107,30 +84,22 @@ renderer.shadowMap.enabled = true
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0x20242c)
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 500)
-camera.position.set(3, 2, 3)
+const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 1000)
+camera.position.set(4, 2.5, 4)
 
 const controls = new OrbitControls(camera, renderer.domElement)
-controls.target.set(0, 0.4, 0)
+controls.target.set(0, 0.5, 0)
 controls.update()
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+scene.add(new THREE.AmbientLight(0xffffff, 0.62))
 
 const sun = new THREE.DirectionalLight(0xffffff, 0.95)
-sun.position.set(5, 10, 5)
+sun.position.set(7, 12, 7)
 sun.castShadow = true
-sun.shadow.mapSize.set(2048, 2048)
-sun.shadow.camera.near = 0.1
-sun.shadow.camera.far = 100
-sun.shadow.camera.left = -20
-sun.shadow.camera.right = 20
-sun.shadow.camera.top = 20
-sun.shadow.camera.bottom = -20
 scene.add(sun)
 
-/* ---------------- Floor / Grid / Contact Shadow ---------------- */
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(80, 80),
+  new THREE.PlaneGeometry(120, 120),
   new THREE.MeshStandardMaterial({
     color: 0x2c313a,
     roughness: 0.95,
@@ -141,11 +110,11 @@ floor.rotation.x = -Math.PI / 2
 floor.receiveShadow = true
 scene.add(floor)
 
-const grid = new THREE.GridHelper(80, 80, 0x4a5568, 0x2d3748)
+const grid = new THREE.GridHelper(120, 120, 0x4a5568, 0x2d3748)
 scene.add(grid)
 
 const contactShadow = new THREE.Mesh(
-  new THREE.CircleGeometry(1, 48),
+  new THREE.CircleGeometry(1, 64),
   new THREE.MeshBasicMaterial({
     color: 0x000000,
     transparent: true,
@@ -155,46 +124,43 @@ const contactShadow = new THREE.Mesh(
 contactShadow.rotation.x = -Math.PI / 2
 scene.add(contactShadow)
 
-function updateFloorVisuals() {
-  const y = clampGround()
-  floor.position.y = y
-  grid.position.y = y + 0.001
-  contactShadow.position.y = y + 0.002
-
-  const visible = ui.showFloor.checked
-  floor.visible = visible
-  grid.visible = visible
-  contactShadow.visible = visible
-}
-updateFloorVisuals()
-
-/* ---------------- Model / Flow State ---------------- */
 const modelRoot = new THREE.Group()
 scene.add(modelRoot)
 
 const stlLoader = new STLLoader()
 const objLoader = new OBJLoader()
+const gltfLoader = new GLTFLoader()
 
-const flow = createFlowField(scene, 1800)
-flow.flowLines.visible = ui.showFlow.checked
+const flow = createFlowField(scene, 220)
+resetFlowField(flow)
 
 let currentModel = null
-let currentModelName = ""
-let geometryData = null
-let aeroData = null
-let vehicleData = null
 let modelBounds = null
-let running = true
+let geometryData = null
+let simulationRunning = false
 
-const scaleState = {
-  currentUniform: 1,
-  currentXYZ: new THREE.Vector3(1, 1, 1),
+let fpsFrames = 0
+let fpsAccum = 0
+
+const raycaster = new THREE.Raycaster()
+const clock = new THREE.Clock()
+
+function updateSimulationStatus() {
+  if (ui.simStatus) ui.simStatus.textContent = simulationRunning ? "RUNNING" : "STOPPED"
 }
 
-const clock = new THREE.Clock()
-const raycaster = new THREE.Raycaster()
+function updateFPS(dt) {
+  fpsFrames++
+  fpsAccum += dt
 
-/* ---------------- Materials / Pressure ---------------- */
+  if (fpsAccum >= 0.5) {
+    const fps = Math.round(fpsFrames / fpsAccum)
+    if (ui.fpsBox) ui.fpsBox.textContent = `FPS ${fps}`
+    fpsFrames = 0
+    fpsAccum = 0
+  }
+}
+
 function createBaseMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -210,14 +176,12 @@ function setModelMaterials(object) {
     child.geometry?.computeVertexNormals?.()
     child.material = createBaseMaterial()
     child.castShadow = true
-    child.receiveShadow = false
   })
 
   if (object.isMesh) {
     object.geometry?.computeVertexNormals?.()
     object.material = createBaseMaterial()
     object.castShadow = true
-    object.receiveShadow = false
   }
 }
 
@@ -237,9 +201,16 @@ function applyPressureMap(object) {
 
     const normals = geometry.attributes.normal
     const positions = geometry.attributes.position
-    const colors = new Float32Array(positions.count * 3)
+    const vcount = positions.count
+    const colors = new Float32Array(vcount * 3)
 
-    for (let i = 0; i < positions.count; i++) {
+    let step = 1
+    if (vcount > 300000) step = 20
+    else if (vcount > 150000) step = 10
+    else if (vcount > 80000) step = 5
+    else if (vcount > 30000) step = 2
+
+    for (let i = 0; i < vcount; i += step) {
       const normal = new THREE.Vector3(
         normals.getX(i),
         normals.getY(i),
@@ -248,9 +219,12 @@ function applyPressureMap(object) {
 
       const p = pressureFromNormal(normal)
 
-      colors[i * 3 + 0] = p
-      colors[i * 3 + 1] = 0.05
-      colors[i * 3 + 2] = 1 - p
+      for (let j = 0; j < step && i + j < vcount; j++) {
+        const k = i + j
+        colors[k * 3 + 0] = p
+        colors[k * 3 + 1] = 0.05
+        colors[k * 3 + 2] = 1 - p
+      }
     }
 
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
@@ -283,11 +257,23 @@ function removePressureMap(object) {
 
 function updatePressureDisplay() {
   if (!currentModel) return
-  if (ui.showPressure.checked) applyPressureMap(currentModel)
+  if (ui.showPressure?.checked) applyPressureMap(currentModel)
   else removePressureMap(currentModel)
 }
 
-/* ---------------- Placement / Camera ---------------- */
+function updateFloorVisuals() {
+  const y = Math.max(0, Number(ui.ground?.value ?? 0.1))
+  floor.position.y = y
+  grid.position.y = y + 0.001
+  contactShadow.position.y = y + 0.002
+
+  const visible = ui.showFloor?.checked ?? true
+  floor.visible = visible
+  grid.visible = visible
+  contactShadow.visible = visible
+}
+updateFloorVisuals()
+
 function updateContactShadow() {
   if (!modelBounds) {
     contactShadow.scale.set(0.0001, 0.0001, 1)
@@ -313,29 +299,107 @@ function fitCameraToModel() {
   modelBounds.getCenter(center)
 
   const maxDim = Math.max(size.x, size.y, size.z)
-  const dist = maxDim * 1.9
+  const dist = maxDim * 2.0
 
   controls.target.copy(center)
-  camera.position.set(center.x + dist, center.y + dist * 0.55, center.z + dist)
-  camera.near = Math.max(0.01, dist / 200)
-  camera.far = dist * 60
+  camera.position.set(center.x + dist, center.y + dist * 0.6, center.z + dist)
+  camera.near = Math.max(0.01, dist / 300)
+  camera.far = dist * 80
   camera.updateProjectionMatrix()
   controls.update()
 }
 
-function placeModelOnGround() {
-  if (!currentModel) return
+function updateSlicePlanePlacement() {
+  if (!flow.slicePlane || !modelBounds) return
 
-  const y = clampGround()
-  const box = new THREE.Box3().setFromObject(currentModel)
-  currentModel.position.y += (y - box.min.y)
-  currentModel.updateMatrixWorld(true)
+  const size = new THREE.Vector3()
+  const center = new THREE.Vector3()
+  modelBounds.getSize(size)
+  modelBounds.getCenter(center)
 
-  modelBounds = new THREE.Box3().setFromObject(currentModel)
-  updateContactShadow()
+  flow.slicePlane.scale.set(
+    Math.max(0.8, size.y * 0.9),
+    Math.max(0.8, size.y * 0.9),
+    1
+  )
+
+  flow.slicePlane.position.set(
+    modelBounds.max.x + Math.max(0.8, size.x * 0.35),
+    center.y + size.y * 0.15,
+    center.z
+  )
 }
 
-/* ---------------- Orientation ---------------- */
+function updateSlicePlane() {
+  if (!flow.sliceCtx || !flow.sliceCanvas || !flow.sliceTexture) return
+
+  const ctx = flow.sliceCtx
+  const canvas2 = flow.sliceCanvas
+  const tex = flow.sliceTexture
+
+  const w = canvas2.width
+  const h = canvas2.height
+
+  ctx.clearRect(0, 0, w, h)
+
+  const wakeLevel = geometryData ? Math.min(1, geometryData.wakeMetric) : 0
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const nx = x / w
+      const ny = y / h
+
+      const rearMask = Math.max(0, (nx - 0.18) / 0.82)
+      const wakeCore = Math.exp(-Math.pow((nx - 0.35) * 4.5, 2))
+      const verticalShape = Math.exp(-Math.pow((ny - 0.5) * 3.6, 2))
+      const noise =
+        0.85 +
+        0.15 * Math.sin(nx * 28.0 + ny * 11.0) +
+        0.10 * Math.sin(nx * 53.0 - ny * 17.0)
+
+      let intensity = rearMask * wakeCore * verticalShape * noise * wakeLevel
+      intensity = Math.max(0, Math.min(1, intensity))
+
+      const r = Math.floor(255 * intensity)
+      const g = Math.floor(220 * (1 - intensity) + 25)
+      const b = Math.floor(255 * (1 - intensity * 0.65))
+
+      ctx.fillStyle = `rgba(${r},${g},${b},0.92)`
+      ctx.fillRect(x, y, 1, 1)
+    }
+  }
+
+  tex.needsUpdate = true
+}
+
+function normalizeModelUnits(object) {
+  object.updateMatrixWorld(true)
+
+  const box = new THREE.Box3().setFromObject(object)
+  const size = new THREE.Vector3()
+  box.getSize(size)
+
+  let maxDim = Math.max(size.x, size.y, size.z)
+  if (maxDim <= 0) return
+
+  let scale = 1
+
+  while (maxDim > 12) {
+    maxDim /= 10
+    scale /= 10
+  }
+
+  while (maxDim < 0.5) {
+    maxDim *= 10
+    scale *= 10
+  }
+
+  if (scale !== 1) {
+    object.scale.multiplyScalar(scale)
+    object.updateMatrixWorld(true)
+  }
+}
+
 function fixUpright(object) {
   object.updateMatrixWorld(true)
 
@@ -357,12 +421,6 @@ function fixUpright(object) {
   if (size.y > size.z * 1.15) {
     object.rotation.x += Math.PI / 2
     object.updateMatrixWorld(true)
-    size = getSize()
-  }
-
-  if (size.z > size.x * 1.05) {
-    object.rotation.y -= Math.PI / 2
-    object.updateMatrixWorld(true)
   }
 }
 
@@ -375,18 +433,19 @@ function alignToFlowYaw(object) {
     object.rotation.y -= Math.PI / 2
     object.updateMatrixWorld(true)
   }
+}
 
-  const box2 = new THREE.Box3().setFromObject(object)
-  const center = new THREE.Vector3()
-  box2.getCenter(center)
+function placeModelOnGround() {
+  if (!currentModel) return
 
-  const front = box2.max.x - center.x
-  const back = center.x - box2.min.x
+  const y = Math.max(0, Number(ui.ground?.value ?? 0.1))
+  const box = new THREE.Box3().setFromObject(currentModel)
+  currentModel.position.y += (y - box.min.y)
+  currentModel.updateMatrixWorld(true)
 
-  if (back > front) {
-    object.rotation.y += Math.PI
-    object.updateMatrixWorld(true)
-  }
+  modelBounds = new THREE.Box3().setFromObject(currentModel)
+  updateContactShadow()
+  updateSlicePlanePlacement()
 }
 
 function rotateCurrentModel(rx = 0, ry = 0, rz = 0) {
@@ -404,12 +463,9 @@ function rotateCurrentModel(rx = 0, ry = 0, rz = 0) {
   currentModel.updateMatrixWorld(true)
 
   placeModelOnGround()
-  modelBounds = new THREE.Box3().setFromObject(currentModel)
-
   updatePressureDisplay()
-  updateContactShadow()
   fitCameraToModel()
-  recalculateAll()
+  recomputeMetrics()
 }
 
 function normalizeAndPlace(object) {
@@ -420,196 +476,241 @@ function normalizeAndPlace(object) {
 
   fixUpright(object)
   alignToFlowYaw(object)
+  normalizeModelUnits(object)
   object.updateMatrixWorld(true)
 
-  // No normalizamos a 1.8 para conservar la escala del archivo.
-  {
-    const box = new THREE.Box3().setFromObject(object)
-    const center = new THREE.Vector3()
-    box.getCenter(center)
-    object.position.sub(center)
-    object.updateMatrixWorld(true)
-  }
+  const box = new THREE.Box3().setFromObject(object)
+  const center = new THREE.Vector3()
+  box.getCenter(center)
+  object.position.sub(center)
+  object.updateMatrixWorld(true)
 
   placeModelOnGround()
-  modelBounds = new THREE.Box3().setFromObject(object)
-
-  scaleState.currentUniform = 1
-  scaleState.currentXYZ.set(1, 1, 1)
-
-  updatePressureDisplay()
-  updateContactShadow()
   fitCameraToModel()
+
+  if (ui.showPressure?.checked) {
+    requestAnimationFrame(() => updatePressureDisplay())
+  }
 }
 
-/* ---------------- Real Scale ---------------- */
+function recomputeMetrics() {
+  if (!currentModel) {
+    geometryData = null
+    writeOutputs()
+    return
+  }
+
+  currentModel.updateMatrixWorld(true)
+
+  const box = new THREE.Box3().setFromObject(currentModel)
+  const size = new THREE.Vector3()
+  box.getSize(size)
+
+  const length = size.x
+  const height = size.y
+  const width = size.z
+  const frontalArea = height * width
+
+  const shapeRatio = width > 0 ? length / width : 1
+  const heightRatio = width > 0 ? height / width : 1
+
+  let cd = 0.34
+  cd += Math.max(0, 1.1 - shapeRatio) * 0.12
+  cd += Math.max(0, heightRatio - 0.75) * 0.18
+  cd = Math.max(0.18, Math.min(1.2, cd))
+
+  const speedMS = Number(ui.speed?.value ?? 120) / 3.6
+  const rho = 1.225
+  const drag = 0.5 * rho * cd * frontalArea * speedMS * speedMS
+
+  let wakeMetric = Math.min(1, Math.max(0.18, cd / 0.9))
+  if (!(ui.showWake?.checked ?? true)) wakeMetric = 0
+
+  geometryData = {
+    length,
+    width,
+    height,
+    frontalArea,
+    cd,
+    drag,
+    wakeMetric,
+  }
+
+  updateSlicePlane()
+  writeOutputs()
+}
+
+function writeOutputs() {
+  if (ui.lengthOut) ui.lengthOut.textContent = geometryData ? fmt(geometryData.length, 2, " m") : "—"
+  if (ui.widthOut) ui.widthOut.textContent = geometryData ? fmt(geometryData.width, 2, " m") : "—"
+  if (ui.heightOut) ui.heightOut.textContent = geometryData ? fmt(geometryData.height, 2, " m") : "—"
+  if (ui.frontalAreaOut) ui.frontalAreaOut.textContent = geometryData ? fmt(geometryData.frontalArea, 2, " m²") : "—"
+  if (ui.cdOut) ui.cdOut.textContent = geometryData ? fmt(geometryData.cd, 3) : "—"
+  if (ui.dragOut) ui.dragOut.textContent = geometryData ? fmt(geometryData.drag, 1, " N") : "—"
+  if (ui.wakeOut) ui.wakeOut.textContent = geometryData ? fmt(geometryData.wakeMetric, 2) : "—"
+}
+
 function applyUniformRealScale() {
   if (!currentModel || !geometryData) return
 
-  const realLength = getNumInput(ui.realLengthInput)
+  const realLength = readPositiveInput(ui.realLength)
   if (!realLength || geometryData.length <= 0) return
 
   const factor = realLength / geometryData.length
   currentModel.scale.multiplyScalar(factor)
-  scaleState.currentUniform *= factor
-  scaleState.currentXYZ.multiplyScalar(factor)
-
   currentModel.updateMatrixWorld(true)
-  placeModelOnGround()
-  modelBounds = new THREE.Box3().setFromObject(currentModel)
 
+  placeModelOnGround()
   updatePressureDisplay()
-  updateContactShadow()
   fitCameraToModel()
-  recalculateAll()
+  recomputeMetrics()
 }
 
 function applyXYZRealScale() {
   if (!currentModel || !geometryData) return
 
-  const realLength = getNumInput(ui.realLengthInput)
-  const realWidth = getNumInput(ui.realWidthInput)
-  const realHeight = getNumInput(ui.realHeightInput)
+  const realLength = readPositiveInput(ui.realLength)
+  const realWidth = readPositiveInput(ui.realWidth)
+  const realHeight = readPositiveInput(ui.realHeight)
 
   if (!realLength || !realWidth || !realHeight) return
   if (geometryData.length <= 0 || geometryData.width <= 0 || geometryData.height <= 0) return
 
-  const fx = realLength / geometryData.length
-  const fy = realHeight / geometryData.height
-  const fz = realWidth / geometryData.width
-
-  currentModel.scale.x *= fx
-  currentModel.scale.y *= fy
-  currentModel.scale.z *= fz
-
-  scaleState.currentXYZ.x *= fx
-  scaleState.currentXYZ.y *= fy
-  scaleState.currentXYZ.z *= fz
-
+  currentModel.scale.x *= realLength / geometryData.length
+  currentModel.scale.y *= realHeight / geometryData.height
+  currentModel.scale.z *= realWidth / geometryData.width
   currentModel.updateMatrixWorld(true)
-  placeModelOnGround()
-  modelBounds = new THREE.Box3().setFromObject(currentModel)
 
+  placeModelOnGround()
   updatePressureDisplay()
-  updateContactShadow()
   fitCameraToModel()
-  recalculateAll()
+  recomputeMetrics()
 }
 
-function resetRealScale() {
+function resetScale() {
   if (!currentModel) return
 
   currentModel.scale.set(1, 1, 1)
-  scaleState.currentUniform = 1
-  scaleState.currentXYZ.set(1, 1, 1)
-
   currentModel.updateMatrixWorld(true)
+
   placeModelOnGround()
-  modelBounds = new THREE.Box3().setFromObject(currentModel)
-
   updatePressureDisplay()
-  updateContactShadow()
   fitCameraToModel()
-  recalculateAll()
+  recomputeMetrics()
 }
 
-/* ---------------- Calculations ---------------- */
-function updateOutputs() {
-  ui.lengthOut.textContent = geometryData ? fmt(geometryData.length, 2, " m") : "—"
-  ui.widthOut.textContent = geometryData ? fmt(geometryData.width, 2, " m") : "—"
-  ui.heightOut.textContent = geometryData ? fmt(geometryData.height, 2, " m") : "—"
-  ui.frontalAreaOut.textContent = geometryData ? fmt(geometryData.frontalArea, 2, " m²") : "—"
-  ui.surfaceOut.textContent = geometryData ? fmt(geometryData.surfaceArea, 2, " m²") : "—"
-  ui.volumeOut.textContent = geometryData ? fmt(geometryData.volume, 2, " m³") : "—"
+function clearModel() {
+  if (currentModel) {
+    modelRoot.remove(currentModel)
+    currentModel = null
+  }
 
-  ui.cdOut.textContent = aeroData ? fmt(aeroData.Cd, 3) : "—"
-  ui.dragOut.textContent = aeroData ? fmt(aeroData.drag, 1, " N") : "—"
-  ui.downforceOut.textContent = aeroData ? fmt(aeroData.downforce, 1, " N") : "—"
-
-  ui.aeroPowerOut.textContent = vehicleData ? fmt(vehicleData.aeroPowerKw, 1, " kW") : "—"
-  ui.totalPowerOut.textContent = vehicleData ? fmt(vehicleData.totalPowerKw, 1, " kW") : "—"
-  ui.topSpeedOut.textContent = vehicleData?.estimatedTopSpeedKmh
-    ? fmt(vehicleData.estimatedTopSpeedKmh, 1, " km/h")
-    : "—"
+  modelBounds = null
+  geometryData = null
+  writeOutputs()
+  resetFlowField(flow)
 }
 
-function recalculateAll() {
-  if (!currentModel) {
-    geometryData = null
-    aeroData = null
-    vehicleData = null
-    updateOutputs()
+function handleLoadedObject(object) {
+  clearModel()
+  normalizeAndPlace(object)
+  recomputeMetrics()
+  resetFlowField(flow)
+}
+
+function loadFile(file) {
+  if (!file) return
+
+  const url = URL.createObjectURL(file)
+  const ext = file.name.split(".").pop().toLowerCase()
+
+  if (ext === "stl") {
+    stlLoader.load(
+      url,
+      (geometry) => {
+        geometry.computeVertexNormals()
+        const mesh = new THREE.Mesh(geometry, createBaseMaterial())
+        handleLoadedObject(mesh)
+        URL.revokeObjectURL(url)
+      },
+      undefined,
+      () => URL.revokeObjectURL(url)
+    )
     return
   }
 
-  geometryData = analyzeGeometry(currentModel)
-
-  aeroData = computeAerodynamics(
-    currentModel,
-    geometryData,
-    Number(ui.speed.value)
-  )
-
-  vehicleData = computeVehicleDynamics(aeroData, {
-    mass: Number(ui.mass.value),
-    rollingCoeff: Number(ui.rollingCoeff.value),
-    motorPowerKw: Number(ui.motorPower.value),
-    frontalArea: geometryData.frontalArea,
-  })
-
-  updateOutputs()
-}
-
-/* ---------------- Flow / Wake ---------------- */
-function updateFlowVisibility() {
-  flow.flowLines.visible = ui.showFlow.checked
-}
-
-function resetFlowVelocities() {
-  for (let i = 0; i < flow.count; i++) {
-    const i3 = i * 3
-    flow.velocities[i3 + 0] = 1
-    flow.velocities[i3 + 1] = (Math.random() - 0.5) * 0.02
-    flow.velocities[i3 + 2] = (Math.random() - 0.5) * 0.02
+  if (ext === "obj") {
+    objLoader.load(
+      url,
+      (obj) => {
+        handleLoadedObject(obj)
+        URL.revokeObjectURL(url)
+      },
+      undefined,
+      () => URL.revokeObjectURL(url)
+    )
+    return
   }
+
+  if (ext === "glb" || ext === "gltf") {
+    gltfLoader.load(
+      url,
+      (gltf) => {
+        handleLoadedObject(gltf.scene)
+        URL.revokeObjectURL(url)
+      },
+      undefined,
+      () => URL.revokeObjectURL(url)
+    )
+    return
+  }
+
+  URL.revokeObjectURL(url)
+}
+
+function updateFlowVisibility() {
+  flow.flowLines.visible = ui.showFlow?.checked ?? true
+  if (flow.slicePlane) flow.slicePlane.visible = ui.showFlow?.checked ?? true
 }
 
 function sculptFlowAroundModel() {
-  if (!currentModel || !ui.showFlow.checked) return
+  if (!currentModel || !(ui.showFlow?.checked ?? true) || !geometryData || !modelBounds) return
 
   const positions = flow.positions
   const velocities = flow.velocities
   const count = flow.count
+  const pointsPerLine = flow.pointsPerLine
 
-  const box = modelBounds || new THREE.Box3().setFromObject(currentModel)
-  const wakeStart = box.max.x
+  const wakeStart = modelBounds.max.x
+  const baseWake = (ui.showWake?.checked ?? true) ? 0.22 : 0.0
+  const globalWakeIntensity = baseWake * (0.7 * geometryData.cd / 0.30 + 0.3 * geometryData.drag / 300)
 
-  const baseWake = ui.showWake.checked ? 0.10 : 0.0
-  const cdFactor = aeroData ? Math.min(2.0, aeroData.Cd / 0.30) : 1.0
-  const dragFactor = aeroData ? Math.min(2.0, aeroData.drag / 300) : 1.0
-  const globalWakeIntensity = baseWake * (0.7 * cdFactor + 0.3 * dragFactor)
-
-  const avoidDist = 0.10
-  const pushStrength = 2.2
+  const avoidDist = 0.22
+  const pushStrength = 2.6
 
   const pos = new THREE.Vector3()
   const dir = new THREE.Vector3(-1, 0, 0)
   const normal = new THREE.Vector3()
 
   for (let i = 0; i < count; i++) {
-    const i6 = i * 6
+    const lineBase = i * pointsPerLine * 3
     const i3 = i * 3
 
-    pos.set(positions[i6 + 0], positions[i6 + 1], positions[i6 + 2])
+    pos.set(
+      positions[lineBase + 0],
+      positions[lineBase + 1],
+      positions[lineBase + 2]
+    )
 
     velocities[i3 + 0] += (1.0 - velocities[i3 + 0]) * 0.02
-    velocities[i3 + 1] *= 0.98
-    velocities[i3 + 2] *= 0.98
+    velocities[i3 + 1] *= 0.985
+    velocities[i3 + 2] *= 0.985
 
     raycaster.set(pos, dir)
     raycaster.far = avoidDist
 
     const hits = raycaster.intersectObject(currentModel, true)
+
     if (hits.length > 0) {
       const hit = hits[0]
 
@@ -621,20 +722,20 @@ function sculptFlowAroundModel() {
 
       const localPressure = pressureFromNormal(normal)
 
-      velocities[i3 + 0] *= 0.85 - localPressure * 0.15
-      velocities[i3 + 1] += normal.y * pushStrength * (0.01 + localPressure * 0.01)
-      velocities[i3 + 2] += normal.z * pushStrength * (0.01 + localPressure * 0.01)
+      velocities[i3 + 0] *= 0.83 - localPressure * 0.18
+      velocities[i3 + 1] += normal.y * pushStrength * (0.012 + localPressure * 0.014)
+      velocities[i3 + 2] += normal.z * pushStrength * (0.012 + localPressure * 0.014)
 
-      if (ui.showWake.checked) {
-        velocities[i3 + 1] += (Math.random() - 0.5) * localPressure * 0.08
-        velocities[i3 + 2] += (Math.random() - 0.5) * localPressure * 0.08
+      if (ui.showWake?.checked ?? true) {
+        velocities[i3 + 1] += (Math.random() - 0.5) * localPressure * 0.10
+        velocities[i3 + 2] += (Math.random() - 0.5) * localPressure * 0.10
       }
     }
 
-    if (pos.x > wakeStart && ui.showWake.checked) {
+    if (pos.x > wakeStart && (ui.showWake?.checked ?? true)) {
       velocities[i3 + 1] += (Math.random() - 0.5) * globalWakeIntensity
       velocities[i3 + 2] += (Math.random() - 0.5) * globalWakeIntensity
-      velocities[i3 + 0] *= 0.992
+      velocities[i3 + 0] *= 0.990
     }
 
     if (pos.y < floor.position.y + 0.02) {
@@ -642,178 +743,71 @@ function sculptFlowAroundModel() {
     }
   }
 
-  flow.flowLines.geometry.attributes.position.needsUpdate = true
+  updateSlicePlane()
 }
 
-/* ---------------- Load / Clear ---------------- */
-function clearCurrentModel() {
-  if (currentModel) {
-    modelRoot.remove(currentModel)
-    currentModel = null
-  }
-
-  currentModelName = ""
-  geometryData = null
-  aeroData = null
-  vehicleData = null
-  modelBounds = null
-
-  updateContactShadow()
-  updateOutputs()
-  resetFlowVelocities()
-}
-
-function handleLoadedObject(object, filename) {
-  clearCurrentModel()
-  currentModelName = filename
-  normalizeAndPlace(object)
-  recalculateAll()
-}
-
-function loadFile(file) {
-  if (!file) return
-
-  const url = URL.createObjectURL(file)
-  const ext = file.name.toLowerCase().split(".").pop()
-
-  if (ext === "stl") {
-    stlLoader.load(
-      url,
-      (geometry) => {
-        geometry.computeVertexNormals()
-        const mesh = new THREE.Mesh(geometry, createBaseMaterial())
-        handleLoadedObject(mesh, file.name)
-        URL.revokeObjectURL(url)
-      },
-      undefined,
-      (err) => {
-        console.error(err)
-        URL.revokeObjectURL(url)
-      }
-    )
-  } else if (ext === "obj") {
-    objLoader.load(
-      url,
-      (obj) => {
-        handleLoadedObject(obj, file.name)
-        URL.revokeObjectURL(url)
-      },
-      undefined,
-      (err) => {
-        console.error(err)
-        URL.revokeObjectURL(url)
-      }
-    )
-  } else {
-    URL.revokeObjectURL(url)
-  }
-}
-
-/* ---------------- Events ---------------- */
-ui.fileInput.addEventListener("change", (e) => {
+ui.fileInput?.addEventListener("change", (e) => {
   const file = e.target.files?.[0]
   if (file) loadFile(file)
-  ui.fileInput.value = ""
 })
 
-ui.clearModel.addEventListener("click", clearCurrentModel)
+ui.clearModel?.addEventListener("click", clearModel)
 
-ui.speed.addEventListener("input", () => {
-  syncLabels()
-  recalculateAll()
+ui.playBtn?.addEventListener("click", () => {
+  simulationRunning = true
+  updateSimulationStatus()
 })
 
-ui.ground.addEventListener("input", () => {
-  syncLabels()
-  updateFloorVisuals()
-  if (currentModel) {
-    placeModelOnGround()
-    recalculateAll()
-  }
+ui.stopBtn?.addEventListener("click", () => {
+  simulationRunning = false
+  updateSimulationStatus()
 })
 
-ui.mass.addEventListener("input", () => {
-  syncLabels()
-  recalculateAll()
-})
-
-ui.rollingCoeff.addEventListener("input", () => {
-  syncLabels()
-  recalculateAll()
-})
-
-ui.motorPower.addEventListener("input", () => {
-  syncLabels()
-  recalculateAll()
-})
-
-ui.applyUniformScaleBtn.addEventListener("click", applyUniformRealScale)
-ui.applyXYZScaleBtn.addEventListener("click", applyXYZRealScale)
-ui.resetScaleBtn.addEventListener("click", resetRealScale)
-
-ui.showFlow.addEventListener("change", updateFlowVisibility)
-ui.showWake.addEventListener("change", () => resetFlowVelocities())
-ui.showPressure.addEventListener("change", () => updatePressureDisplay())
-ui.showFloor.addEventListener("change", updateFloorVisuals)
-
-ui.playBtn.addEventListener("click", () => {
-  running = true
-})
-
-ui.stopBtn.addEventListener("click", () => {
-  running = false
-})
-
-ui.resetCam.addEventListener("click", () => {
+ui.resetCam?.addEventListener("click", () => {
   controls.reset()
-  camera.position.set(3, 2, 3)
-  controls.target.set(0, 0.4, 0)
+  camera.position.set(4, 2.5, 4)
+  controls.target.set(0, 0.5, 0)
   controls.update()
 })
 
-ui.saveTestBtn.addEventListener("click", () => {
-  if (!geometryData || !aeroData || !vehicleData) return
-
-  saveTestResult({
-    model: currentModelName,
-    velocity: Number(ui.speed.value),
-    height: Number(ui.ground.value),
-    frontalArea: geometryData.frontalArea,
-    Cd: aeroData.Cd,
-    drag: aeroData.drag,
-    downforce: aeroData.downforce,
-    powerRequired: vehicleData.totalPowerKw,
-    topSpeed: vehicleData.estimatedTopSpeedKmh,
-  })
+ui.speed?.addEventListener("input", () => {
+  updateLabels()
+  recomputeMetrics()
 })
 
-ui.exportCsvBtn.addEventListener("click", () => {
-  exportCSV("tunel_r01_historial.csv")
+ui.ground?.addEventListener("input", () => {
+  updateLabels()
+  updateFloorVisuals()
+  if (currentModel) {
+    placeModelOnGround()
+    recomputeMetrics()
+  }
 })
 
-ui.clearHistoryBtn.addEventListener("click", () => {
-  clearHistory()
+ui.showFlow?.addEventListener("change", updateFlowVisibility)
+ui.showWake?.addEventListener("change", recomputeMetrics)
+ui.showPressure?.addEventListener("change", updatePressureDisplay)
+ui.showFloor?.addEventListener("change", updateFloorVisuals)
+
+ui.rotXPos?.addEventListener("click", () => rotateCurrentModel(Math.PI / 2, 0, 0))
+ui.rotXNeg?.addEventListener("click", () => rotateCurrentModel(-Math.PI / 2, 0, 0))
+ui.rotYPos?.addEventListener("click", () => rotateCurrentModel(0, Math.PI / 2, 0))
+ui.rotYNeg?.addEventListener("click", () => rotateCurrentModel(0, -Math.PI / 2, 0))
+ui.rotZPos?.addEventListener("click", () => rotateCurrentModel(0, 0, Math.PI / 2))
+ui.rotZNeg?.addEventListener("click", () => rotateCurrentModel(0, 0, -Math.PI / 2))
+
+ui.applyUniformScale?.addEventListener("click", applyUniformRealScale)
+ui.applyXYZScale?.addEventListener("click", applyXYZRealScale)
+ui.resetScale?.addEventListener("click", resetScale)
+
+window.addEventListener("dragover", (e) => {
+  e.preventDefault()
 })
 
-ui.rotXPos.addEventListener("click", () => rotateCurrentModel(Math.PI / 2, 0, 0))
-ui.rotXNeg.addEventListener("click", () => rotateCurrentModel(-Math.PI / 2, 0, 0))
-ui.rotYPos.addEventListener("click", () => rotateCurrentModel(0, Math.PI / 2, 0))
-ui.rotYNeg.addEventListener("click", () => rotateCurrentModel(0, -Math.PI / 2, 0))
-ui.rotZPos.addEventListener("click", () => rotateCurrentModel(0, 0, Math.PI / 2))
-ui.rotZNeg.addEventListener("click", () => rotateCurrentModel(0, 0, -Math.PI / 2))
-
-window.addEventListener("keydown", (e) => {
-  if (!currentModel) return
-  const key = e.key.toLowerCase()
-
-  if (key === "q") rotateCurrentModel(Math.PI / 2, 0, 0)
-  if (key === "a") rotateCurrentModel(-Math.PI / 2, 0, 0)
-
-  if (key === "w") rotateCurrentModel(0, Math.PI / 2, 0)
-  if (key === "s") rotateCurrentModel(0, -Math.PI / 2, 0)
-
-  if (key === "e") rotateCurrentModel(0, 0, Math.PI / 2)
-  if (key === "d") rotateCurrentModel(0, 0, -Math.PI / 2)
+window.addEventListener("drop", (e) => {
+  e.preventDefault()
+  const file = e.dataTransfer.files?.[0]
+  if (file) loadFile(file)
 })
 
 window.addEventListener("resize", () => {
@@ -824,19 +818,21 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix()
 })
 
-/* ---------------- Animate ---------------- */
 function animate() {
   requestAnimationFrame(animate)
 
-  const delta = Math.min(clock.getDelta(), 0.03)
+  const dt = Math.min(clock.getDelta(), 0.03)
+  updateFPS(dt)
 
-  if (running) {
-    updateFlowField(flow, delta, Number(ui.speed.value) / 25)
+  if (simulationRunning && (ui.showFlow?.checked ?? true)) {
+    updateFlowField(flow, dt, Number(ui.speed?.value ?? 120) / 10)
     sculptFlowAroundModel()
   }
 
   renderer.render(scene, camera)
 }
 
-updateOutputs()
+updateSimulationStatus()
+updateFlowVisibility()
+writeOutputs()
 animate()

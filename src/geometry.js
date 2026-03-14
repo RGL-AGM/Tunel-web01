@@ -17,7 +17,7 @@ export function analyzeGeometry(object) {
   const width = size.z
 
   const frontalArea = height * width
-  const surfaceArea = computeSurfaceAreaWorld(object)
+  const surfaceArea = computeSurfaceAreaWorldSampled(object)
   const volume = length * width * height
 
   return {
@@ -27,17 +27,16 @@ export function analyzeGeometry(object) {
     frontalArea,
     surfaceArea,
     volume,
-    center
+    center,
   }
 }
 
-export function computeSurfaceAreaWorld(object) {
+function computeSurfaceAreaWorldSampled(object) {
   let totalArea = 0
 
   const a = new THREE.Vector3()
   const b = new THREE.Vector3()
   const c = new THREE.Vector3()
-
   const ab = new THREE.Vector3()
   const ac = new THREE.Vector3()
   const cross = new THREE.Vector3()
@@ -51,6 +50,19 @@ export function computeSurfaceAreaWorld(object) {
     const pos = geometry.attributes.position
     const index = geometry.index
 
+    let triangleCount = index ? index.count / 3 : pos.count / 3
+    let step = 1
+
+    if (triangleCount > 200000) step = 30
+    else if (triangleCount > 100000) step = 20
+    else if (triangleCount > 50000) step = 10
+    else if (triangleCount > 20000) step = 5
+    else if (triangleCount > 10000) step = 3
+    else if (triangleCount > 5000) step = 2
+
+    let sampledArea = 0
+    let sampledTriangles = 0
+
     const addTriangle = (ia, ib, ic) => {
       a.fromBufferAttribute(pos, ia).applyMatrix4(child.matrixWorld)
       b.fromBufferAttribute(pos, ib).applyMatrix4(child.matrixWorld)
@@ -60,17 +72,22 @@ export function computeSurfaceAreaWorld(object) {
       ac.subVectors(c, a)
       cross.crossVectors(ab, ac)
 
-      totalArea += cross.length() * 0.5
+      sampledArea += cross.length() * 0.5
+      sampledTriangles++
     }
 
     if (index) {
-      for (let i = 0; i < index.count; i += 3) {
+      for (let i = 0; i < index.count; i += 3 * step) {
         addTriangle(index.getX(i), index.getX(i + 1), index.getX(i + 2))
       }
     } else {
-      for (let i = 0; i < pos.count; i += 3) {
+      for (let i = 0; i < pos.count; i += 3 * step) {
         addTriangle(i, i + 1, i + 2)
       }
+    }
+
+    if (sampledTriangles > 0) {
+      totalArea += sampledArea * step
     }
   })
 
