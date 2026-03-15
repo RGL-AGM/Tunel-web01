@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-
   <header class="topbar">
     <div class="brand">
       <img src="/agm_logo.png" class="logo" alt="AGM logo" />
@@ -18,7 +17,7 @@
     </div>
 
     <div class="topbar-right">
-      <div class="software-version" id="softwareVersion">R01.3</div>
+      <div class="software-version" id="softwareVersion">R02.1</div>
       <div class="fps-box" id="fpsBox">FPS 0</div>
       <div class="status" id="simStatus">STOPPED</div>
     </div>
@@ -35,6 +34,16 @@
           </label>
           <button id="clearModel">Quitar</button>
         </div>
+        <div class="row">
+          <button id="exportCsvBtn">Exportar CSV</button>
+          <button id="resetCam">Reset cámara</button>
+        </div>
+        <div class="metric compact">
+          <span>Complejidad</span><b id="complexityOut">—</b>
+        </div>
+        <div class="metric compact">
+          <span>Estado modelo</span><b id="modelStatusOut">Sin modelo</b>
+        </div>
       </section>
 
       <section class="block">
@@ -42,7 +51,6 @@
         <div class="row">
           <button id="playBtn">Play</button>
           <button id="stopBtn">Stop</button>
-          <button id="resetCam">Reset cámara</button>
         </div>
 
         <label>Velocidad <span id="speedVal">120 km/h</span></label>
@@ -50,6 +58,13 @@
 
         <label>Altura al suelo <span id="groundVal">0.10 m</span></label>
         <input id="ground" type="range" min="0" max="0.50" step="0.01" value="0.10" />
+
+        <label>Calidad simulación</label>
+        <select id="quality">
+          <option value="LOW">LOW</option>
+          <option value="MEDIUM" selected>MEDIUM</option>
+          <option value="HIGH">HIGH</option>
+        </select>
       </section>
 
       <section class="block">
@@ -58,6 +73,18 @@
         <label><input id="showWake" type="checkbox" checked /> Estela</label>
         <label><input id="showPressure" type="checkbox" checked /> Presión</label>
         <label><input id="showFloor" type="checkbox" checked /> Suelo</label>
+      </section>
+
+      <section class="block">
+        <h3>Vehículo</h3>
+        <label>Masa (kg)</label>
+        <input id="massInput" type="number" min="100" step="10" value="1500" />
+
+        <label>Potencia motor (kW)</label>
+        <input id="powerInput" type="number" min="1" step="1" value="150" />
+
+        <label>Coef. rodadura</label>
+        <input id="crrInput" type="number" min="0.005" max="0.03" step="0.001" value="0.012" />
       </section>
 
       <section class="block">
@@ -102,13 +129,7 @@
         <div class="metric"><span>Anchura</span><b id="widthOut">—</b></div>
         <div class="metric"><span>Altura</span><b id="heightOut">—</b></div>
         <div class="metric"><span>Área frontal</span><b id="frontalAreaOut">—</b></div>
-      </section>
-
-      <section class="block">
-        <h3>Aerodinámica aprox.</h3>
-        <div class="metric"><span>Cd</span><b id="cdOut">—</b></div>
-        <div class="metric"><span>Drag</span><b id="dragOut">—</b></div>
-        <div class="metric"><span>Wake</span><b id="wakeOut">—</b></div>
+        <div class="metric"><span>Superficie</span><b id="surfaceAreaOut">—</b></div>
       </section>
     </aside>
 
@@ -137,6 +158,30 @@
             <span>Baja</span>
             <span>Alta</span>
           </div>
+        </div>
+      </div>
+
+      <div class="results-panel" id="resultsPanel">
+        <div class="results-title">Aerodinámica</div>
+        <div class="metric"><span>Cx</span><b id="cxOut">—</b></div>
+        <div class="metric"><span>Cl</span><b id="clOut">—</b></div>
+        <div class="metric"><span>Drag</span><b id="dragOut">—</b></div>
+        <div class="metric"><span>Downforce</span><b id="downforceOut">—</b></div>
+        <div class="metric"><span>Wake index</span><b id="wakeOut">—</b></div>
+        <div class="metric"><span>Eficiencia aero</span><b id="efficiencyOut">—</b></div>
+        <div class="metric"><span>Potencia req.</span><b id="powerReqOut">—</b></div>
+        <div class="metric"><span>Velocidad máx.</span><b id="topSpeedOut">—</b></div>
+      </div>
+
+      <div class="viewer-bottom-panel" id="viewerBottomPanel">
+        <div class="results-title">Datos técnicos</div>
+        <div class="viewer-grid">
+          <div class="metric"><span>Velocidad actual</span><b id="viewerSpeedOut">—</b></div>
+          <div class="metric"><span>Masa</span><b id="massOut">—</b></div>
+          <div class="metric"><span>Área frontal</span><b id="viewerFrontalAreaOut">—</b></div>
+          <div class="metric"><span>Rodadura</span><b id="rollingOut">—</b></div>
+          <div class="metric"><span>Longitud</span><b id="viewerLengthOut">—</b></div>
+          <div class="metric"><span>Anchura</span><b id="viewerWidthOut">—</b></div>
         </div>
       </div>
 

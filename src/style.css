@@ -1,10 +1,15 @@
-html, body {
+html,
+body {
   margin: 0;
   height: 100%;
   font-family: Arial, Helvetica, sans-serif;
   background: #0f1116;
   color: #e6edf3;
   overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 .topbar {
@@ -15,13 +20,12 @@ html, body {
   height: 64px;
   background: #141820;
   border-bottom: 1px solid #2c3340;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  z-index: 20;
-  box-sizing: border-box;
+  z-index: 30;
 }
 
 .brand {
@@ -33,7 +37,7 @@ html, body {
 .logo {
   height: 40px;
   width: auto;
-  filter: drop-shadow(0 0 6px rgba(0,0,0,0.4));
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
 }
 
 .brand-text {
@@ -89,7 +93,6 @@ html, body {
   display: flex;
   height: 100vh;
   padding-top: 64px;
-  box-sizing: border-box;
 }
 
 .panel {
@@ -98,7 +101,6 @@ html, body {
   border-right: 1px solid #2c3340;
   padding: 16px;
   overflow-y: auto;
-  box-sizing: border-box;
 }
 
 .block {
@@ -124,16 +126,23 @@ html, body {
   justify-content: space-between;
   gap: 8px;
   margin: 6px 0;
+  font-size: 14px;
+}
+
+.metric.compact {
+  font-size: 13px;
 }
 
 .metric b {
   color: #8de0ff;
+  text-align: right;
 }
 
 .viewer {
   flex: 1;
   position: relative;
   min-width: 0;
+  overflow: hidden;
 }
 
 #mainCanvas {
@@ -159,22 +168,48 @@ html, body {
   right: 16px;
 }
 
-.legend-card {
-  min-width: 180px;
-  background: rgba(15, 17, 22, 0.72);
+.legend-card,
+.results-panel,
+.viewer-bottom-panel {
+  background: rgba(15, 17, 22, 0.76);
   border: 1px solid rgba(64, 78, 96, 0.9);
-  border-radius: 8px;
-  padding: 10px 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(4px);
 }
 
+.legend-card {
+  min-width: 180px;
+  padding: 10px 12px;
+}
+
+.results-panel {
+  position: absolute;
+  top: 88px;
+  right: 16px;
+  width: 250px;
+  z-index: 9;
+  padding: 12px 14px;
+}
+
+.viewer-bottom-panel {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9;
+  padding: 12px 14px;
+  max-width: 620px;
+}
+
+.results-title,
 .legend-title {
   font-size: 12px;
   font-weight: 700;
   color: #dbe7f2;
   margin-bottom: 8px;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .legend-row {
@@ -205,8 +240,15 @@ html, body {
   width: 180px;
   height: 14px;
   border-radius: 4px;
-  background: linear-gradient(90deg, #1c52ff 0%, #009dff 25%, #00d4c8 45%, #ff7a00 72%, #ff0000 100%);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(
+    90deg,
+    #1c52ff 0%,
+    #009dff 25%,
+    #00d4c8 45%,
+    #ff7a00 72%,
+    #ff0000 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .pressure-labels {
@@ -215,6 +257,12 @@ html, body {
   margin-top: 6px;
   font-size: 11px;
   color: #c7d3df;
+}
+
+.viewer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 4px 16px;
 }
 
 .dropzone {
@@ -229,20 +277,26 @@ html, body {
   letter-spacing: 0.5px;
 }
 
+.dropzone.hidden {
+  display: none;
+}
+
 button,
-.file-btn {
+.file-btn,
+select {
   background: #2c3340;
   color: white;
   border: none;
   padding: 7px 12px;
   cursor: pointer;
-  box-sizing: border-box;
   min-height: 34px;
   font-size: 14px;
+  border-radius: 4px;
 }
 
 button:hover,
-.file-btn:hover {
+.file-btn:hover,
+select:hover {
   background: #3b4353;
 }
 
@@ -251,13 +305,182 @@ button:hover,
 }
 
 input[type="range"],
-input[type="number"] {
+input[type="number"],
+select {
   width: 100%;
-  box-sizing: border-box;
   margin: 6px 0 10px 0;
 }
 
 label {
   display: block;
   margin: 6px 0;
+}
+
+@media (max-width: 1100px) {
+  .panel {
+    width: 290px;
+  }
+
+  .results-panel {
+    width: 230px;
+  }
+
+  .viewer-bottom-panel {
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 900px) {
+  html,
+  body {
+    overflow: hidden;
+  }
+
+  .layout {
+    flex-direction: column;
+  }
+
+  .panel {
+    width: 100%;
+    height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid #2c3340;
+    padding-bottom: 24px;
+  }
+
+  .viewer {
+    height: calc(62vh - 64px);
+    min-height: 300px;
+  }
+
+  .results-panel {
+    top: 16px;
+    right: 16px;
+    width: 220px;
+  }
+
+  .viewer-bottom-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 12px;
+    height: 58px;
+  }
+
+  .layout {
+    padding-top: 58px;
+  }
+
+  .brand-title {
+    font-size: 18px;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .software-version {
+    display: none;
+  }
+
+  .panel {
+    height: 42vh;
+    padding: 12px;
+  }
+
+  .viewer {
+    height: calc(58vh - 58px);
+  }
+
+  .results-panel {
+    position: absolute;
+    top: auto;
+    right: 12px;
+    bottom: 110px;
+    width: 210px;
+  }
+
+  .viewer-bottom-panel {
+    padding: 10px 12px;
+  }
+
+  .viewer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 10px;
+  }
+
+  .top-left,
+  .top-right {
+    top: 10px;
+  }
+
+  .top-left {
+    left: 10px;
+  }
+
+  .top-right {
+    right: 10px;
+  }
+
+  .legend-card {
+    min-width: 150px;
+    padding: 8px 10px;
+  }
+
+  .pressure-scale {
+    width: 140px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .fps-box,
+  .status {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .panel {
+    height: 46vh;
+  }
+
+  .viewer {
+    height: calc(54vh - 58px);
+  }
+
+  .results-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: 130px;
+  }
+
+  .viewer-bottom-panel {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .viewer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-right {
+    display: none;
+  }
+
+  .dropzone {
+    font-size: 16px;
+    padding: 0 18px;
+    text-align: center;
+  }
 }

@@ -19,6 +19,7 @@ export function analyzeGeometry(object) {
   const frontalArea = height * width
   const surfaceArea = computeSurfaceAreaWorldSampled(object)
   const volume = length * width * height
+  const triangleCount = countTriangles(object)
 
   return {
     length,
@@ -28,7 +29,23 @@ export function analyzeGeometry(object) {
     surfaceArea,
     volume,
     center,
+    triangleCount,
+    box,
   }
+}
+
+export function countTriangles(object) {
+  let total = 0
+
+  object.traverse((child) => {
+    if (!child.isMesh || !child.geometry?.attributes?.position) return
+    const geometry = child.geometry
+    const pos = geometry.attributes.position
+    const index = geometry.index
+    total += index ? index.count / 3 : pos.count / 3
+  })
+
+  return Math.round(total)
 }
 
 function computeSurfaceAreaWorldSampled(object) {

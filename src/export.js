@@ -4,14 +4,16 @@ export function saveTestResult(data) {
   const record = {
     date: new Date().toISOString(),
     model: data.model ?? "",
-    velocity: data.velocity ?? 0,
-    height: data.height ?? 0,
+    velocityKmh: data.velocityKmh ?? 0,
+    massKg: data.massKg ?? 0,
     frontalArea: data.frontalArea ?? 0,
     Cd: data.Cd ?? 0,
-    drag: data.drag ?? 0,
-    downforce: data.downforce ?? 0,
-    powerRequired: data.powerRequired ?? 0,
-    topSpeed: data.topSpeed ?? 0,
+    Cl: data.Cl ?? 0,
+    dragN: data.dragN ?? 0,
+    downforceN: data.downforceN ?? 0,
+    wakeIndex: data.wakeIndex ?? 0,
+    requiredPowerKw: data.requiredPowerKw ?? 0,
+    topSpeedKmh: data.topSpeedKmh ?? 0,
   }
 
   history.push(record)

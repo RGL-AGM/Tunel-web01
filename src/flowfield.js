@@ -1,7 +1,14 @@
 import * as THREE from "three"
 
-export function createFlowField(scene, count = 220) {
-  const segmentsPerLine = 18
+export function getFlowCountByQuality(quality = "MEDIUM") {
+  if (quality === "LOW") return 120
+  if (quality === "HIGH") return 400
+  return 220
+}
+
+export function createFlowField(scene, quality = "MEDIUM") {
+  const count = getFlowCountByQuality(quality)
+  const segmentsPerLine = quality === "HIGH" ? 24 : 18
   const pointsPerLine = segmentsPerLine + 1
 
   const positions = new Float32Array(count * pointsPerLine * 3)
@@ -38,8 +45,8 @@ export function createFlowField(scene, count = 220) {
   scene.add(flowLines)
 
   const sliceCanvas = document.createElement("canvas")
-  sliceCanvas.width = 220
-  sliceCanvas.height = 120
+  sliceCanvas.width = quality === "HIGH" ? 320 : quality === "LOW" ? 180 : 220
+  sliceCanvas.height = quality === "HIGH" ? 160 : quality === "LOW" ? 96 : 120
   const sliceCtx = sliceCanvas.getContext("2d")
 
   const sliceTexture = new THREE.CanvasTexture(sliceCanvas)
@@ -71,7 +78,19 @@ export function createFlowField(scene, count = 220) {
     sliceCtx,
     sliceTexture,
     slicePlane,
+    quality,
   }
+}
+
+export function disposeFlowField(scene, flow) {
+  if (!flow) return
+  scene.remove(flow.flowLines)
+  scene.remove(flow.slicePlane)
+  flow.flowLines.geometry.dispose()
+  flow.flowLines.material.dispose()
+  flow.slicePlane.geometry.dispose()
+  flow.slicePlane.material.map?.dispose?.()
+  flow.slicePlane.material.dispose()
 }
 
 export function resetFlowField(flow) {

@@ -84,15 +84,18 @@ export function computeAerodynamics(object, geometryData, velocityKmh) {
 
   const shapeFactor = frontWeightedArea / frontalArea
   let Cd = 0.18 + shapeFactor * 0.12
-  Cd = Math.min(Math.max(Cd, 0.18), 1.20)
+  Cd = clamp(Cd, 0.18, 0.75)
 
   let Cl = -(verticalForceProxy / frontalArea) * 0.08
-  Cl = Math.min(Math.max(Cl, -3.0), 1.5)
+  Cl = clamp(Cl, -1.5, 1.0)
 
   const q = 0.5 * AIR_DENSITY * velocityMS * velocityMS
 
   const drag = q * Cd * frontalArea
-  const downforce = q * Math.abs(Cl) * frontalArea * Math.sign(-Cl)
+  const lift = q * Cl * frontalArea
+  const downforce = Math.max(0, -lift)
+  const wakeIndex = clamp((Cd - 0.18) / 0.57, 0.12, 1.0)
+  const aeroEfficiency = Math.abs(Cl) / Math.max(Cd, 1e-6)
 
   return {
     airDensity: AIR_DENSITY,
@@ -101,8 +104,15 @@ export function computeAerodynamics(object, geometryData, velocityKmh) {
     Cd,
     Cl,
     drag,
+    lift,
     downforce,
+    wakeIndex,
+    aeroEfficiency,
     frontWeightedArea,
     verticalForceProxy,
   }
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max)
 }
